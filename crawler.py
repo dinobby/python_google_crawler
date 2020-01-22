@@ -2,6 +2,8 @@ import time
 import random
 import requests
 from bs4 import BeautifulSoup
+from selenium import webdriver
+browser = webdriver.Chrome("C:\Program Files\Google\chromedriver.exe")
 
 user_agents = ['Mozilla/5.0 (Windows NT 6.1; WOW64; rv:23.0) Gecko/20130406 Firefox/23.0', \
       'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:18.0) Gecko/20100101 Firefox/18.0', \
@@ -16,44 +18,51 @@ user_agents = ['Mozilla/5.0 (Windows NT 6.1; WOW64; rv:23.0) Gecko/20130406 Fire
        Chrome/28.0.1468.0 Safari/537.36', \
       'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.0; Trident/5.0; TheWorld)']
 
-# get free proxy from free-proxy-list.net
-proxy_site = 'https://free-proxy-list.net/'
-res = requests.get(url=proxy_site)
-soup = BeautifulSoup(res.text, "html.parser")
-rows = soup.select("tr > td")
-proxies_pool = []
-for i in range(0, 100, 8):
-    full_proxy = "http://" + rows[i].string + ":" + rows[i+1].string
-    proxies_pool.append(full_proxy)
-
+block_site = ['youtube', 'twitter', 'facebook', 'kkbox', 'instagram', 'twitch', 'weibo']
+results = {}
 def google_search(search_list, num_page = 1):
-    results = {}
+    global results
     for x in search_list:
-        results[x] = {}
-        for page in range(num_page):
-            url = 'https://www.google.com.tw/search?q=' + x + "&start=" + str(page*10)
-            time.sleep(3)
-            while True:
-                index = random.randint(0, 9)
-                proxies = {"http": proxies_pool[index]}
-                headers = {'User-Agent': user_agents[index]}
-                res = requests.get(url=url, headers=headers, proxies=proxies)
-                soup = BeautifulSoup(res.text, "html.parser")
-                search_title = soup.find_all("h3", class_="LC20lb")
-                search_content = soup.find_all("span", class_="st")
-                if (search_title):
-                    if "title" not in results[x].keys():
-                        results[x]["title"] = [search_title[i].text for i in range(len(search_title))]
-                    else:
-                        results[x]["title"].extend([search_title[i].text for i in range(len(search_title))])
-                    if "snippet" not in results[x].keys():
-                        results[x]["snippet"] = [search_content[i].text for i in range(len(search_content))]
-                    else:
-                        results[x]["snippet"].extend([search_content[i].text for i in range(len(search_content))])
-                    search_counts = int(soup.find("div", id="resultStats").text.split(" ")[1].replace(",",""))
-                    print(search_counts)
-                    break
-                else:
-                    print("faild to crawled anything, retrying...")
-                    continue
+        if x not in results:
+            results[x] = {}
+            for page in range(num_page):
+                url = 'http://www.google.com.tw/search?q=' + x + '&start=' + str(page*10)
+                time.sleep(3)
+                try:
+                    while True:
+                        time.sleep(1)
+                        index = random.randint(0, 9)
+                        headers = {'User-Agent': user_agents[index]}
+                        browser.get(url)
+                        soup = BeautifulSoup(browser.page_source, "html.parser")
+                        search_block = soup.find_all("div", class_="g")
+                        if (search_block): #if crawler's working fine
+                            for i in search_block:
+                                if sum([k in i.find("a").get('href') for k in block_site]) == 0:
+                                    if "title" not in results[x].keys():
+                                        results[x]["title"] = [i.find("h3").text]
+                                    else:
+                                        results[x]["title"].extend([i.find("h3").text])
+                                    if "snippet" not in results[x].keys():
+                                        results[x]["snippet"] = [i.find("span", class_='st').text]
+                                    else:
+                                        results[x]["snippet"].extend([i.find("span", class_='st').text])
+                                else:
+                                    continue
+                            # results count
+                            count_text = soup.find("div", id="resultStats").text.split(" ")
+                            if count_text[1] != "項結果":
+                                search_counts = int(count_text[1].replace(",",""))
+                            else:
+                                search_counts = int(count_text[0].replace(",",""))
+                            results[x]["count"] = search_counts
+                            break
+                        else: #crawler being blocked
+                            print("faild to crawl anything, retrying...")
+                            time.sleep(20)
+                            continue
+                except Exception as e:
+                    print(e)
+        else:
+            continue
     return results
