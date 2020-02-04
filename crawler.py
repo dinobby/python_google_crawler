@@ -51,7 +51,7 @@ def google_search(search_list, num_page = 1):
                                     continue
                             # results count
                             count_text = soup.find("div", id="resultStats").text.split(" ")
-                            if count_text[1] != "項結果":
+                            if count_text[1] != "項結果": # this may vary depending on your country
                                 search_counts = int(count_text[1].replace(",",""))
                             else:
                                 search_counts = int(count_text[0].replace(",",""))
